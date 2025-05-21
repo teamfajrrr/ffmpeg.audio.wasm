@@ -1,6 +1,5 @@
 import express from 'express';
 import multer from 'multer';
-import { createFFmpeg, fetchFile } from '@ffmpeg/ffmpeg';
 import fs from 'fs/promises';
 
 const app = express();
@@ -8,6 +7,9 @@ const upload = multer({ dest: 'uploads/' });
 
 app.post('/cut', upload.single('audio'), async (req, res) => {
   const { start = '00:00:00', duration = '00:00:30' } = req.body;
+
+  // Dynamic import workaround
+  const { createFFmpeg, fetchFile } = await import('@ffmpeg/ffmpeg');
 
   const ffmpeg = createFFmpeg({ log: true });
   await ffmpeg.load();
@@ -22,7 +24,7 @@ app.post('/cut', upload.single('audio'), async (req, res) => {
   res.setHeader('Content-Type', 'audio/mpeg');
   res.send(Buffer.from(output));
 
-  await fs.unlink(req.file.path); // clean temp file
+  await fs.unlink(req.file.path); // cleanup
 });
 
 const PORT = process.env.PORT || 3000;
