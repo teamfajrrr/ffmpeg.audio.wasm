@@ -5,7 +5,7 @@ import fs from 'fs/promises';
 const app = express();
 const upload = multer({ dest: 'uploads/' });
 
-app.post('/cut', upload.single('data'), async (req, res) => {
+app.post('/cut', upload.single('audio'), async (req, res) => {
   const start = req.body?.start || '00:00:00';
   const duration = req.body?.duration || '00:00:30';
 
