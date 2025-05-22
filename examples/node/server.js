@@ -1,72 +1,68 @@
 import express from 'express';
 import multer from 'multer';
 import fs from 'fs/promises';
+import path from 'path';
 import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
 
+// Setup Express and file upload middleware
 const app = express();
 const upload = multer({ dest: 'uploads/' });
 
-// Required to resolve __dirname in ES module mode
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const __dirname = path.dirname(__filename);
 
-// Endpoint for cutting audio
+// Cut audio route
 app.post('/cut', upload.single('audio'), async (req, res) => {
-  console.log('[cut] Incoming request to /cut');
+  console.log('[cut] ▶ Incoming request to /cut');
 
   const start = req.body?.start || '00:00:00';
   const duration = req.body?.duration || '00:00:30';
 
-  console.log('[cut] start:', start, '| duration:', duration);
-
   if (!req.file) {
-    console.warn('[cut] No file provided in the request.');
+    console.warn('[cut] ❌ No file received in request');
     return res.status(400).json({ error: 'Audio file is required.' });
   }
 
-  console.log('[cut] File received:', req.file.originalname, '| Size:', req.file.size, 'bytes');
+  console.log(`[cut] 📦 File received: ${req.file.originalname} (${req.file.size} bytes)`);
+  console.log(`[cut] ⏱️ Cut from ${start} for ${duration}`);
 
   try {
-    console.time('[cut] Load ffmpeg');
+    console.time('[cut] ⬇ Load ffmpeg');
     const { createFFmpeg, fetchFile } = await import('@ffmpeg/ffmpeg');
 
+    // ✅ Absolute path to wasm loader required in Railway
     const ffmpeg = createFFmpeg({
       log: true,
-      corePath: join(__dirname, '../../../node_modules/@ffmpeg/core/dist/ffmpeg-core.js') // ✅ fixed path
+      corePath: '/app/node_modules/@ffmpeg/core/dist/ffmpeg-core.js',
     });
 
     await ffmpeg.load();
-    console.timeEnd('[cut] Load ffmpeg');
+    console.timeEnd('[cut] ⬇ Load ffmpeg');
 
-    console.log('[cut] Reading input buffer from disk...');
     const buffer = await fs.readFile(req.file.path);
-
-    console.log('[cut] Writing input.mp3 to virtual FS...');
     ffmpeg.FS('writeFile', 'input.mp3', await fetchFile(buffer));
 
-    console.time('[cut] Running ffmpeg command');
+    console.time('[cut] 🛠️ Processing with ffmpeg');
     await ffmpeg.run('-i', 'input.mp3', '-ss', start, '-t', duration, '-c', 'copy', 'output.mp3');
-    console.timeEnd('[cut] Running ffmpeg command');
+    console.timeEnd('[cut] 🛠️ Processing with ffmpeg');
 
-    console.log('[cut] Reading output file from virtual FS...');
     const output = ffmpeg.FS('readFile', 'output.mp3');
+    console.log('[cut] ✅ Audio cut complete — sending file');
 
-    console.log('[cut] Success, sending output');
     res.setHeader('Content-Type', 'audio/mpeg');
     res.send(Buffer.from(output));
   } catch (err) {
-    console.error('[cut] Error occurred:', err);
+    console.error('[cut] 💥 ffmpeg error:', err);
     res.status(502).json({
       error: 'ffmpeg failed',
       message: err.message,
     });
   } finally {
     try {
-      console.log('[cut] Cleaning up uploaded temp file');
       await fs.unlink(req.file.path);
-    } catch (err) {
-      console.warn('[cut] Cleanup failed:', err.message);
+      console.log('[cut] 🧹 Temp file cleaned up');
+    } catch (cleanupErr) {
+      console.warn('[cut] ⚠️ Cleanup failed:', cleanupErr.message);
     }
   }
 });
@@ -74,5 +70,5 @@ app.post('/cut', upload.single('audio'), async (req, res) => {
 // Start server
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
-  console.log(`✅ ffmpeg.wasm API is running on port ${PORT}`);
+  console.log(`🚀 ffmpeg.wasm API running on port ${PORT}`);
 });
