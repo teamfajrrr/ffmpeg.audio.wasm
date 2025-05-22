@@ -23,7 +23,11 @@ app.post('/cut', upload.single('audio'), async (req, res) => {
   try {
     console.time('[cut] Load ffmpeg');
     const { createFFmpeg, fetchFile } = await import('@ffmpeg/ffmpeg');
-    const ffmpeg = createFFmpeg({ log: true });
+    const { createFFmpeg, fetchFile } = await import('@ffmpeg/ffmpeg');
+    const ffmpeg = createFFmpeg({
+    log: true,
+    corePath: './node_modules/@ffmpeg/core/dist/ffmpeg-core.js'
+});
 
     await ffmpeg.load();
     console.timeEnd('[cut] Load ffmpeg');
