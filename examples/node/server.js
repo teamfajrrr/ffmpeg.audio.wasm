@@ -1,10 +1,17 @@
 import express from 'express';
 import multer from 'multer';
 import fs from 'fs/promises';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
 const app = express();
 const upload = multer({ dest: 'uploads/' });
 
+// Required to resolve __dirname in ES module mode
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Endpoint for cutting audio
 app.post('/cut', upload.single('audio'), async (req, res) => {
   console.log('[cut] Incoming request to /cut');
 
@@ -23,10 +30,11 @@ app.post('/cut', upload.single('audio'), async (req, res) => {
   try {
     console.time('[cut] Load ffmpeg');
     const { createFFmpeg, fetchFile } = await import('@ffmpeg/ffmpeg');
+
     const ffmpeg = createFFmpeg({
-    log: true,
-    corePath: './node_modules/@ffmpeg/core/dist/ffmpeg-core.js'
-});
+      log: true,
+      corePath: join(__dirname, '../../../node_modules/@ffmpeg/core/dist/ffmpeg-core.js') // ✅ fixed path
+    });
 
     await ffmpeg.load();
     console.timeEnd('[cut] Load ffmpeg');
@@ -63,8 +71,8 @@ app.post('/cut', upload.single('audio'), async (req, res) => {
   }
 });
 
+// Start server
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
-  console.log(`ffmpeg.wasm API running on port ${PORT}`);
+  console.log(`✅ ffmpeg.wasm API is running on port ${PORT}`);
 });
-
